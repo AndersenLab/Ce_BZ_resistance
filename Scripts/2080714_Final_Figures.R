@@ -223,13 +223,12 @@ gwa_mappings <- gwa_mappings%>%
 
 gwa_mappings_bar <- gwa_mappings %>%
   dplyr::distinct(strain, value, marker, ben1_prediction)%>%
+  dplyr::arrange(marker)%>%
+  dplyr::distinct(strain, value, .keep_all=T)%>%
   dplyr::arrange(value)%>%
   dplyr::mutate(strain2 = factor(strain, levels = unique(strain), labels = unique(strain), ordered = T))%>%
-  dplyr::distinct(strain, value, .keep_all=T)%>%
   dplyr::mutate(norm_pheno_temp = ifelse(value == min(value), 0, 1))%>%
-  dplyr::mutate(delta_pheno = ifelse(norm_pheno_temp == 0, 0, 
-                                     ifelse(norm_pheno_temp == 1 & value < 0 , abs(lag(value) - value) , 
-                                            ifelse(norm_pheno_temp == 1 & value > 0 ,  value - lag(value) , NA ))))%>%
+  dplyr::mutate(delta_pheno = ifelse(norm_pheno_temp == 0, 0, abs(dplyr::lag(value) - value)))%>%
   dplyr::mutate(norm_pheno = cumsum(delta_pheno)) %>%
   dplyr::mutate(final_pheno = norm_pheno/max(norm_pheno))
 
@@ -744,7 +743,7 @@ run_TukeyHSD(main_figure,trait_of_interest)
 
 ############ Figure 4 B: competition assay plot ########
 
-competition_assay <- data.table::fread(file = paste0(raw_data.dir,"competition_assay.csv"))%>%
+competition_assay <- data.table::fread(file = paste0(final.dir,"TS14_competition_assay.csv"))%>%
   dplyr::filter(TargetType == "Ch1Unknown")%>%
   dplyr::select(Condition, Replicate, Generation, FractionalAbundance)%>%
   dplyr::mutate(id = paste(Condition,Generation, sep = "-")) %>%
@@ -783,7 +782,7 @@ CA_plot <-competition_assay_outliers%>%
   theme(legend.title = element_text(colour="black", size = 15, face = "bold"))+
   theme(legend.text = element_text(colour="black", size = 14))+
   labs( x = "Generation")+
-  labs( y = "Allele Frequency (%)")+
+  labs( y = expression(bold(paste("Allele Frequency of ", bolditalic("ben-1"), " Edits (%)"))))+
   plot.theme+
   theme(legend.position="top")
 
@@ -1019,8 +1018,44 @@ ggsave(paste0(plot.dir,"FS8_GWAS_Xqtl_split_colored_by_ben1_variation.png"),
        height = 8, 
        width = 8)
 
+
+
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
-# FIGURE S9 - Tajima's D for tubulins
+# FIGURE S11 - phenotyping WN2002 
+# ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ #
+
+# read wild strain HTA data 
+
+
+assayregressed_WI <- data.table::fread(paste0(final.dir,"TS23_WI_rephenotype_HTA_processed.tsv"))
+
+assayregressed_WI%>%
+  dplyr::filter(trait == trait_of_interest, condition == "Albendazole")%>%
+  ggplot(.) +
+  aes(x = factor(strain, levels = c("N2", "JU2141", "WN2002","JU2581")), 
+      y = phenotype, 
+      fill=strain) +
+  geom_boxplot(outlier.colour = NA, alpha = 0.7)+
+  theme_bw()+
+  labs( y = "Animal length")+
+  scale_fill_manual(values=c("hotpink3","cadetblue3","orange","gray75"),name="Strain")+
+  plot.theme +
+  theme(axis.title.x = element_blank(),
+        legend.position="none")
+
+ggsave(paste0(plot.dir,"FS9_WN2002_HTA.png"), 
+       dpi = 300,
+       height = 6, 
+       width = 10)
+
+
+# ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
+# FIGURE S10 - Generated in Jalview
+# ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ #
+
+
+# ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
+# FIGURE S11 - Tajima's D for tubulins
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ #
 ys <- c(-2.6, 0.5)
 # III:3537688..3541628
@@ -1109,7 +1144,7 @@ ytitle <- ggdraw() + draw_label("Tajima's D", fontface='bold', angle = 90, size 
 
 plot_grid(ytitle, plot_w_title, ncol=2, rel_widths=c(0.025, 1))
 
-ggsave(paste0(plot.dir,"FS9_TajimaDfigure.png"), 
+ggsave(paste0(plot.dir,"FS11_TajimaDfigure.png"), 
        dpi = 300,
        height = 10, 
        width = 10)
@@ -1117,38 +1152,5 @@ ggsave(paste0(plot.dir,"FS9_TajimaDfigure.png"),
 ggsave(paste0(plot.dir,"TajimaDfigure.pdf"), 
        dpi = 300,
        height = 10, 
-       width = 10)
-
-# ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
-# FIGURE S10 - Generated in Jalview
-# ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ #
-
-
-# ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
-# FIGURE S11 - phenotyping WN2002 
-# ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ #
-
-# read wild strain HTA data 
-
-
-assayregressed_WI <- data.table::fread(paste0(final.dir,"TS23_WI_rephenotype_HTA_processed.tsv"))
-
-assayregressed_WI%>%
-  dplyr::filter(trait == trait_of_interest, condition == "Albendazole")%>%
-  ggplot(.) +
-  aes(x = factor(strain, levels = c("N2", "JU2141", "WN2002","JU2581")), 
-      y = phenotype, 
-      fill=strain) +
-  geom_boxplot(outlier.colour = NA, alpha = 0.7)+
-  theme_bw()+
-  labs( y = "Animal length")+
-  scale_fill_manual(values=c("hotpink3","cadetblue3","orange","gray75"),name="Strain")+
-  plot.theme +
-  theme(axis.title.x = element_blank(),
-        legend.position="none")
-
-ggsave(paste0(plot.dir,"FS11_WN2002_HTA.png"), 
-       dpi = 300,
-       height = 6, 
        width = 10)
 

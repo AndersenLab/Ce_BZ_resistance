@@ -1,12 +1,12 @@
 # Table script for ben-1 manuscript
-try(setwd(dirname(rstudioapi::getActiveDocumentContext()$path)))
-setwd(system("git rev-parse --show-toplevel", intern =T))
 
-# set file locations
-data.dir <- paste0("Raw_data/")
-plot.dir <- paste0("Final_Figures/")
-script.dir <- paste0("Scripts/")
-final.dir <- paste0("Final_Tables/")
+
+# set to location of files
+main.dir <- "~/Dropbox/HTA/Results/2017_anthelmintic_gwa/analysis/ben1_paper/"
+data.dir <- paste0(main.dir,"Raw_data/")
+plot.dir <- paste0(main.dir,"Plots/")
+script.dir <- paste0(main.dir,"Scripts/")
+final.dir <- paste0(main.dir,"Final_Tables/")
 
 source(paste0(script.dir,"ben1_processing_functions.R"))
 
@@ -369,8 +369,8 @@ syn
 
 library(PopGenome)
 vcf_name = "WI.20170531.impute.vcf.gz"
-slide_distance = 1
-window_size = 100
+slide_distance = 50
+window_size = 2000
 
 chr3 <- c(1,13783801)
 
@@ -398,7 +398,7 @@ gen2 <- PopGenome::set.outgroup(gen, c("XZ1516"),  diploid = FALSE)
 s_gen <- PopGenome::sliding.window.transform(gen2, 
                                              width = window_size, 
                                              jump = slide_distance, 
-                                             whole.data = FALSE)
+                                             type = 2)
 
 s_gen_stats <- PopGenome::detail.stats(s_gen)
 s_gen_stats <- PopGenome::neutrality.stats(s_gen_stats,detail = T)
@@ -462,13 +462,21 @@ write.table(plt_df,
 # read ASSAY 
 HTA_raw<- read_data(paste0(data.dir,"20180312_ben1_edits/"))
 
-save(HTA_raw, file = paste0(final.dir,"TS12_HTA_ben-1_raw.Rda"))
-
 # Remove all data from the contaminated wells
 raw_nocontam <- remove_contamination(HTA_raw)
 
 # Summarize the data
 summedraw <- sumplate(raw_nocontam, quantiles = TRUE)
+
+# too big for plos pathogens
+# save(HTA_raw, file = paste0(final.dir,"TS12_HTA_ben-1_raw.Rda"))
+
+write.table(summedraw, 
+            file = paste0(final.dir,"TS12_HTA_ben-1_summarized.tsv"), 
+            sep = "\t", 
+            quote = F, 
+            col.names = T, 
+            row.names = F)
 
 # Prune based on biological impossibilities
 biopruned <- bioprune(summedraw)%>%

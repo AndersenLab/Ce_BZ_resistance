@@ -9,7 +9,7 @@
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
 main.dir <- "~/Dropbox/HTA/Results/2017_anthelmintic_gwa/analysis/ben1_paper/"
 data.dir <- paste0(main.dir,"Raw_data/")
-plot.dir <- paste0(main.dir,"Final_Figures/")
+plot.dir <- paste0(main.dir,"Final_Figures/TIFFs/")
 script.dir <- paste0(main.dir,"Scripts/")
 final.dir <- paste0(main.dir,"Final_Tables/")
 
@@ -91,17 +91,17 @@ size_DR <- subtract_controls%>%
   theme(axis.title.x = element_blank(),
         axis.text.x = element_blank(),
         legend.position = "top", 
-        legend.background = element_rect(color = "black", size = 1, linetype = "solid"),
-        legend.text = element_text(size =14),
+        legend.background = element_rect(color = "black", size = 0.5, linetype = "solid"),
+        legend.text = element_text(size =10),
         legend.direction = "horizontal",
         legend.justification = "right")
 
-plot_grid( size_DR,brood_DR, labels = "AUTO", ncol = 1, align = 'v', label_size = 18)
+plot_grid( size_DR,brood_DR, labels = "AUTO", ncol = 1, align = 'v', label_size = 12)
 
-ggsave(paste0(plot.dir,"FS1_DR_",condition_of_interest,"_",trait_of_interest,".png"), 
+ggsave(paste0(plot.dir,"S1_fig.pdf"), 
        dpi = 300,
-       height = 6, 
-       width = 10)
+       height = 4.5, 
+       width = 7.5)
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
 #  FIGURE 1 -PLOT GWAS and BURDEN
@@ -120,20 +120,22 @@ q90burden_pr <- data.table::fread(paste0(final.dir, "TS8_burden_test_mappings.ts
 burden_manplot <- q90burden_pr%>%
   ggplot()+
   aes(x = POS/1e6, y = Stat, size = NumVar, alpha = 0.5, color = significant)+
-  geom_point()+
+  geom_point(size = 0.25)+
   scale_color_manual(values=c("black","red"))+
   facet_grid(.~CHROM, scales = "free", space = "free")+
   theme_bw()+
   plot.theme+
-  ggplot2::theme(legend.position = "none")+
+  ggplot2::theme(legend.position = "none",
+                 strip.background = element_blank(),
+                 strip.text = element_blank())+
   labs(x = "Genomic Position (Mb)", y = "Test Statisitic")
 
-plot_grid(snv_manplot, burden_manplot, labels = "AUTO", ncol = 1, align = 'v', label_size = 18, rel_heights = c(.9,1))
+plot_grid(snv_manplot, burden_manplot, labels = "AUTO", ncol = 1, align = 'v', label_size = 11, rel_heights = c(1,1))
 
-ggsave(paste0(plot.dir,"F1_GWA-BURDEN_",condition_of_interest,"_",trait_of_interest,".png"), 
+ggsave(paste0(plot.dir,"Fig1.tiff"), 
        dpi = 300,
-       height = 6, 
-       width = 12)
+       height = 3.5, 
+       width = 7, compression = "lzw")
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
 #  FIGURE S2 - PLOT GWAS and BURDEN
@@ -163,7 +165,7 @@ bottom_row <- plot_grid(animal_length_qtl_ld, scale = 1)
 
 plot_grid(animal_length_pxg, bottom_row, labels = "AUTO", ncol = 1, align = 'v', label_size = 18)
 
-ggsave(paste0(plot.dir,"FS2_GWA-SNV_PXG_LD_",condition_of_interest,"_",trait_of_interest,".png"), 
+ggsave(paste0(plot.dir,"S2_fig.pdf"), 
        dpi = 300,
        height = 6, 
        width = 8)
@@ -512,7 +514,8 @@ syn
 tree <-  ape::read.tree( file = paste0(final.dir, "genome.tree"))
 
 tree <- ggtree(tree, 
-               branch.length = "rate") 
+               branch.length = "rate", size = .2) 
+
 
 ben1_variation_matrix <- gwa_mappings%>%
   dplyr::ungroup()%>%
@@ -533,16 +536,29 @@ ben1_strain_markers <- ben1_variation_matrix %>%
                                                 ifelse(grepl("ins", marker,ignore.case = T),"Insertion",
                                                        ifelse(grepl("inv", marker),"Inversion",
                                                               ifelse(grepl("stop", marker),"Stop Gained",
-                                                                     ifelse(grepl("trans", marker),"Transposon Insertion",
+                                                                     ifelse(grepl("trans", marker),"Transposon\nInsertion",
                                                                             ifelse(grepl("missense", marker),"Missense","Splice Donor"))))))))
 
-ben1_tree <- tree %<+% ben1_strain_markers+ 
-  geom_tippoint(aes( color=ben1_prediction), size = 2)+
-  scale_color_manual(values=colors,name = expression(paste("Variation at ", italic("ben-1")))) 
-
-ben1_tree <- tree %<+% ben1_strain_markers+ 
-  geom_tippoint(aes( color=ben1_prediction), size = 2)+
-  scale_color_manual(values=colors,name = expression(paste("Variation at ", italic("ben-1")))) + coord_flip() + scale_x_reverse()
+ben1_tree <- tree %<+% na.omit(ben1_strain_markers)+ 
+  geom_tippoint(aes( color=ben1_prediction), size = 0.3)+
+  scale_color_manual(values=colors,
+                     name = expression(paste(italic("ben-1"), " variation")),
+                     labels = c("Deletion", "Insertion", "Inversion", "Missense",
+                                "Splice Donor", "Stop Gained", "Transposon\nInsertion", ""),
+                     guide = guide_legend(title.position = "top", 
+                                          ncol=2))+
+  coord_flip() + 
+  scale_x_reverse()+
+  theme(legend.background = element_rect(fill= 'white',
+                                         size=0.25, 
+                                         linetype="solid", 
+                                         colour ="black"),
+        legend.text = element_text(colour="black", size=8),
+        legend.title = element_text(colour="black", size=10, face = "bold"),
+        legend.justification = c(1, 0), 
+        legend.position = c(0.3, .1),
+        legend.box = "horizontal",
+        legend.key.size = unit(.1, "cm"))
 
 # # # MAP 
 world <- map_data("world")
@@ -555,20 +571,19 @@ isolation_info <- readr::read_tsv("https://elegansvariation.org/strain/strain_da
 isolation_info$long <- as.numeric(isolation_info$long)
 isolation_info$lat <- as.numeric(isolation_info$lat)
 
-map <- ggplot()+ geom_map(data=world, map=world,
-                          aes(x=long, y=lat, map_id=region),
-                          color="white", fill="#7f7f7f", size=0.05, alpha=1)+
+map <-ggplot()+ geom_map(data=world, map=world,
+                         aes(x=long, y=lat, map_id=region),
+                         color="white", fill="#7f7f7f", 
+                         size=0.05, alpha=1)+
   geom_point(data=dplyr::filter(isolation_info, !is.na(marker)),  
-             aes(x=long, y=lat, fill=ben1_prediction), size = 2, shape = 21)+
-  scale_fill_manual(values=colors,name = expression(paste("Variation at ", italic("ben-1"))))+
+             aes(x=long, y=lat, color = ben1_prediction), 
+             size = 0.5)+
+  scale_color_manual(values=colors,
+                     name = expression(paste(italic("ben-1"), " variation")),
+                     guide = guide_legend(title.position = "top", 
+                                          ncol=2))+
   theme_map()+ 
-  theme(legend.background = element_rect(fill= 'white',
-                                         size=0.5, 
-                                         linetype="solid", 
-                                         colour ="black"),
-        legend.text = element_text(colour="black", size=14),
-        legend.title = element_text(colour="black", size=16, face = "bold"),
-        legend.position = "bottom")
+  theme(legend.position = "none")
 
 
 ### NEUTRALITY STATS
@@ -611,35 +626,51 @@ neutrality_df <- tidyr::gather(neutrality_df, statistic, value, -Population, -Wi
 plt_df <- neutrality_df%>%
   dplyr::filter(statistic %in%c("Tajima.D","Fay.Wu.H","Zeng.E"))%>%
   dplyr::mutate(f_stats = ifelse(statistic == "Tajima.D", "Tajima's D",
-                                 ifelse(statistic == "Fay.Wu.H", "Fay and Wu's H","Zeng's E")))
+                                 ifelse(statistic == "Fay.Wu.H", "Fay & Wu's H","Zeng's E")))
 statspt <- plt_df%>%
   ggplot()+
-  aes(x = WindowPosition/1e6, y = as.numeric(value), fill = f_stats)+
-  scale_color_manual(values = "blue")+
-  geom_point(shape = 21, size =1.5)+
-  scale_fill_manual(values=c("hotpink3","black","cadetblue3"), name = "")+
-  theme_bw(18)+
-  theme(axis.text.x = ggplot2::element_text(size = 16),
-        axis.text.y = ggplot2::element_text(size = 16),
-        axis.title.x = ggplot2::element_text(size = 18, face = "bold", color = "black", vjust = -0.3),
-        axis.title.y = ggplot2::element_blank(), strip.text.y = element_text(size = 14, face = "bold"))+
+  aes(x = WindowPosition/1e6, 
+      y = as.numeric(value), 
+      color = f_stats)+
+  geom_line(size = 0.25)+
+  scale_color_manual(values=c("hotpink3","black","cadetblue3"), name = "",
+                     guide = guide_legend(label.hjust = 0,
+                                          label.position = "left",
+                                          reverse = T,
+                                          override.aes = list(shape = 15,
+                                                              size = 1)))+
+  theme_bw()+
+  plot.theme +
+  theme(axis.title.y = ggplot2::element_blank(),
+        legend.text = element_text(colour="black", size=8),
+        legend.background = element_rect(color = "black", size = 0.25))+
   labs(x = "Genomic Position (Mb)")+
-  geom_vline(aes(xintercept=c(3.541595)), linetype="dotdash", alpha = 0.5, color = "black")+
-  geom_vline(aes(xintercept=c(3.538293)), linetype="dotdash", alpha = 0.5, color = "black") +
-  theme(strip.background = element_blank(),legend.position = "top")+
-  guides(colour=guide_legend(override.aes = list(size = 4)))
+  geom_vline(aes(xintercept=c(3.541595)),
+             linetype="dotdash", alpha = 0.5, color = "black")+
+  geom_vline(aes(xintercept=c(3.538293)), 
+             linetype="dotdash", alpha = 0.5, color = "black") +
+  theme(legend.justification = c(0, 0), 
+        legend.position = c(0.01, 0.01),
+        legend.title = element_blank(),
+        legend.key.height = unit(0.01,"cm"),
+        legend.key.width = unit(0.01,"cm"))
 
 topplot <- cowplot::plot_grid(statspt,
                               map,
-                              labels = c("A","B"), rel_widths = c(0.5,1),label_size = 18)
+                              labels = c("A","B"), 
+                              rel_widths = c(0.6,1),label_size = 11)
 
-bottomplot <- cowplot::plot_grid(ben1_tree, labels = c("C"), label_size = 18)
+bottomplot <- cowplot::plot_grid(ben1_tree, labels = c("C"), label_size = 11)
 
-cowplot::plot_grid(topplot,bottomplot, nrow = 2)
+cowplot::plot_grid(topplot,bottomplot, 
+                   rel_heights = c(1,.7),
+                   nrow = 2)
 
- ggsave(paste0(plot.dir,"F3_neut_map_phylo.png"),
-       height = 10,
-       width  = 14,
+
+
+ggsave(paste0(plot.dir,"Fig3.pdf"),
+       height = 4.645,
+       width  = 6.5,
        dpi = 300)
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ## ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ #
@@ -650,7 +681,8 @@ phenos <- gwa_mappings %>%
   dplyr::select(strain,value)
 
 ben_by_subs <-readr::read_tsv("https://elegansvariation.org/strain/strain_data.tsv")%>%
-  dplyr::filter(reference_strain == "True")%>%
+  dplyr::filter(reference_strain == "True",
+                release != "20180413")%>%
   dplyr::select(strain = isotype, long = longitude, lat = latitude, landscape, substrate)%>%
   dplyr::filter(lat != "None")%>%
   dplyr::left_join(ben1_strain_markers,.,by="strain")%>%
@@ -663,11 +695,12 @@ ben_by_subs <-readr::read_tsv("https://elegansvariation.org/strain/strain_data.t
 
 ben_by_subs$landscape <- gsub(" zoo","",ben_by_subs$landscape)
 ben_by_subs$landscape <- gsub(" ","\n",ben_by_subs$landscape)
+ben_by_subs$substrate <- gsub(" ","\n",ben_by_subs$substrate)
 
 sample_loc_plot <- ggplot(ben_by_subs)+
   aes(x = LoF, fill = factor(landscape))+
   geom_bar(position="fill",color = "black")+
-  theme_classic(20)+
+  theme_classic()+
   labs(x = expression(paste("Variation at ", italic("ben-1"))),
        y = "Frequency")+
   scale_fill_brewer(palette = "Set1",name = "Sampling\nLocation")+
@@ -676,8 +709,10 @@ sample_loc_plot <- ggplot(ben_by_subs)+
 substrate_type <- ggplot(ben_by_subs)+
   aes(x = LoF, fill = factor(substrate))+
   geom_bar(position="fill",color = "black")+
-  scale_fill_manual(values=ancestry.colours,name = "Sampling\nSubstrate")+
-  theme_classic(20)+
+  scale_fill_manual(values=ancestry.colours,
+                    name = "Sampling\nSubstrate",
+                    guide = guide_legend(ncol=2))+
+  theme_classic()+
   labs(x = expression(paste("Variation at ", italic("ben-1"))),
        y = "Frequency")+
   plot.theme+
@@ -688,12 +723,12 @@ cowplot::plot_grid(sample_loc_plot,
                    ncol = 2, 
                    align = 'h', 
                    rel_widths = c(1,1), 
-                   label_size = 18)
+                   label_size = 11)
 
-ggsave(paste0(plot.dir,"FS4_sampling_location_substrate.png"),
+ggsave(paste0(plot.dir,"S4_fig.pdf"),
        dpi = 300,
-       height = 6, 
-       width = 10)
+       height = 4.5, 
+       width = 7.5)
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ## ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ #
 # FIGURE 4 - HTA and competition assay of F200Y and DEL alleles
@@ -774,25 +809,38 @@ CA_plot <-competition_assay_outliers%>%
   dplyr::mutate(id = paste0(Strain,Condition))%>%
   ggplot(aes(x=Generation, y=Mean, fill=Condition, color=Strain))+
   scale_y_continuous(limits = c(40, 100))+
-  geom_errorbar(aes(ymin=Mean - SND, ymax=Mean + SND), width=.1, position=position_dodge(0.05))+
+  geom_errorbar(aes(ymin=Mean - SND, ymax=Mean + SND), 
+                width=.1, 
+                position=position_dodge(0.05))+
   geom_line(aes(linetype=Condition, group=id))+
   geom_point()+
-  scale_color_manual(values = c("cadetblue3", "hotpink3"))+
+  scale_color_manual(values = c("cadetblue3", "hotpink3"),
+                     guide= guide_legend(nrow=2,
+                                         keyheight = 1))+
+  scale_linetype_manual(values = c(1, 2),
+                        guide= guide_legend(nrow=2, 
+                                            keywidth = 2,
+                                            keyheight = 1))+
   theme_bw()+
-  theme(legend.title = element_text(colour="black", size = 15, face = "bold"))+
-  theme(legend.text = element_text(colour="black", size = 14))+
+  theme(legend.title = element_text(colour="black", size = 10, face = "bold"))+
+  theme(legend.text = element_text(colour="black", size = 8))+
   labs( x = "Generation")+
   labs( y = expression(bold(paste("Allele Frequency of ", bolditalic("ben-1"), " Edits (%)"))))+
   plot.theme+
   theme(legend.position="top")
 
 
-plot_grid( HTA_plot,CA_plot, labels = "AUTO", ncol = 2, align = 'v', label_size = 18)
+plot_grid( HTA_plot,CA_plot, labels = "AUTO", ncol = 2, align = 'v', label_size = 11)
 
-ggsave(paste0(plot.dir,"F4_CRISPR_strains_HTA_CA.png"), 
+ggsave(paste0(plot.dir,"Fig4.tiff"), 
        dpi = 300,
-       height = 6, 
-       width = 12)
+       height = 3.75, 
+       width = 7.5)
+
+ggsave(paste0(plot.dir,"Fig4.pdf"), 
+       dpi = 300,
+       height = 3.75, 
+       width = 7.5)
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ## ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ #
 # FIGURE S5 - HTA and competition assay of F200Y and DEL alleles - all strains
@@ -815,10 +863,10 @@ pr_df%>%
   theme(axis.title.x = element_blank(),
         legend.position="none")
 
-ggsave(paste0(plot.dir,"FS5_CRISPR_strains_HTA_complete.png"), 
+ggsave(paste0(plot.dir,"S5_fig.pdf"), 
        dpi = 300,
-       height = 6, 
-       width = 12)
+       height = 3.75, 
+       width = 7.5)
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
 # FIGURE 5 - CHRX manhattan plot and fine mapping
@@ -827,7 +875,9 @@ ggsave(paste0(plot.dir,"FS5_CRISPR_strains_HTA_complete.png"),
 pr_resid_maps <- data.table::fread( paste0(final.dir,"TS17_GWA_marker_mappings_ben1_regressed.tsv"))
 manhattan_plots <- manplot_edit(pr_resid_maps)
 
-ben1_resid_manplot <- manhattan_plots[[1]]+theme_bw(15) +plot.theme + theme(legend.position = "none")
+ben1_resid_manplot <- manhattan_plots[[1]] +
+  plot.theme + 
+  theme(legend.position = "none")
 
 ben1_resid_genes <- data.table::fread( paste0(final.dir,"TS18_GWA_marker_fine_mappings_ben1_regressed.tsv"))
 
@@ -857,24 +907,30 @@ fine_map <- ben1_resid_genes %>%
   ggplot()+
   aes(x = POS/1e6, y = -log10(corrected_spearman_cor_p), 
       fill=tidy_effect,color = tidy_effect, shape = tidy_effect)+
-  geom_point(size =2)+
+  geom_point(size =1)+
   ggplot2::labs(x = "Genomic Position (Mb)",
                 y = expression(bold(-log[10](bolditalic(p)))))+
   scale_color_brewer(palette="Set1", name = "Effect:")+
   scale_fill_brewer(palette="Set1", name = "Effect:")+
   scale_shape_manual(values = c(16:25), name = "Effect:")+
-  # facet_grid(.~qtl_name, scales= "free_x")+
-  theme_bw(15)+
+  theme_bw()+
   plot.theme+
-  theme(axis.title.y = element_blank())
+  theme(axis.title.y = element_blank(),
+  legend.text = element_text(colour="black", size=8),
+  legend.title = element_text(colour="black", size=10, face = "bold"),
+  legend.key.size = unit(.1, "cm"))
 
 plot_grid(ben1_resid_manplot, fine_map, labels = c("A","B"), 
-          label_size = 18, ncol = 2, align = 'v', rel_widths = c(2,1))
+          label_size = 11, ncol = 2, align = 'v', rel_widths = c(1.5,1))
 
-ggsave(paste0(plot.dir,"F5_Ben-1_variation_regressed_manplot_finemap_",condition_of_interest,"_",trait_of_interest,".png"), 
+ggsave(paste0(plot.dir,"Fig5.tiff"), 
        dpi = 300,
-       height = 6, 
-       width = 18)
+       height = 2.5, 
+       width = 7.5)
+ggsave(paste0(plot.dir,"Fig5.pdf"), 
+       dpi = 300,
+       height = 2.5, 
+       width = 7.5)
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
 # FIGURE S6 - CHRX burden
@@ -885,24 +941,18 @@ benreg_burden <- read.table(paste0(final.dir, "TS21_GWA_ben1_regressed.VariableT
 benreg_burden%>%
   ggplot()+
   aes(x = POS/1e6, y = Stat, size = NumVar, alpha = 0.5, color = significant)+
-  geom_point()+
+  geom_point(size = 0.3)+
   scale_color_manual(values=c("black","red"))+
   facet_grid(.~CHROM, scales = "free", space = "free")+
   theme_bw()+
-  ggplot2::theme(axis.text.x = ggplot2::element_text(size = 16),
-                 axis.text.y = ggplot2::element_text(size = 16),
-                 axis.title.x = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3), 
-                 axis.title.y = ggplot2::element_text(size = 16, face = "bold", color = "black"), 
-                 strip.text.x = ggplot2::element_text(size = 12, face = "bold", color = "black"), 
-                 strip.text.y = ggplot2::element_text(size = 12, face = "bold", color = "black"), 
-                 plot.title = ggplot2::element_text(size = 24, face = "bold", vjust = 1), 
-                 panel.background = ggplot2::element_rect(color = "black",size = 1.2),
-                 legend.position = "none")+
+  plot.theme +
+  ggplot2::theme(legend.position = "none",
+                 strip.background = element_blank())+
   labs(x = "Genomic Position (Mb)", y = "Test Statisitic")
 
-ggsave(paste0(plot.dir,"FS6_GWA_Ben1regressed_BURDEN_VTprice_manplot.png"), 
-       height = 4, 
-       width = 12)
+ggsave(paste0(plot.dir,"S6_fig.pdf"), 
+       height = 2.5, 
+       width = 7.5)
 
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
@@ -935,7 +985,7 @@ ben1_snps_pr <- ben1_snps%>%
 ben1_variants <- dplyr::bind_rows(ben1_snps_pr,pr_indels)%>%
   dplyr::filter(GT=="ALT")
 
-gwa_mappings <- data.table::fread(file = paste0(data.dir,"GWAS_processed_mapping.tsv"))%>%
+gwa_mappings <- data.table::fread(paste0(final.dir,"TS5_GWA_processed_marker_mapping.tsv"))%>%
   na.omit()%>%
   dplyr::mutate(snpGT = ifelse(allele==-1,"REF", "ALT"))%>%
   dplyr::select(snpMarker = marker, strain, trait, value, snpGT)%>%
@@ -964,27 +1014,22 @@ ggplot(gwa_mappings)+
   aes(x = snpGT, y = value)+
   geom_boxplot(outlier.colour = NA)+
   facet_grid(.~marker2)+
-  geom_jitter(shape = 21, color= "black", fill = "gray90", alpha = 0.5, data = dplyr::filter(gwa_mappings, is.na(marker)))+
-  geom_jitter(aes(fill=ben1_prediction), data = na.omit(gwa_mappings), shape = 21, color= "black", size = 2)+
+  geom_jitter(shape = 21, color= "black", fill = "gray90", 
+              alpha = 0.5, data = dplyr::filter(gwa_mappings, is.na(marker)),
+              size = 0.3)+
+  geom_jitter(aes(fill=ben1_prediction), data = na.omit(gwa_mappings), 
+              shape = 21, color= "black", size = 1)+
   scale_fill_manual(values=colors,name = expression(paste("Variation at ", italic("ben-1"))))+
   theme_bw()+
-  ggplot2::theme(axis.text.x = ggplot2::element_text(size = 16),
-                 axis.text.y = ggplot2::element_text(size = 16),
-                 axis.title.x = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3), 
-                 axis.title.y = ggplot2::element_text(size = 16, face = "bold", color = "black"), 
-                 strip.text.x = ggplot2::element_text(size = 12, face = "bold", color = "black"), 
-                 strip.text.y = ggplot2::element_text(size = 12, face = "bold", color = "black"), 
-                 plot.title = ggplot2::element_text(size = 24, face = "bold", vjust = 1), 
-                 panel.background = ggplot2::element_rect(color = "black",size = 1.2))+
+  ggplot2::theme(panel.background = ggplot2::element_rect(color = "black",size = 1.2),
+                 strip.background = element_blank(),
+                 panel.border = element_rect(size = 0.1))+
   labs(x = "SNV Genotype at QTL", y = paste0("Animal Length (", trait_of_interest,")"))
 
-ggsave(paste0(plot.dir,"FS7_GWA_",trait_of_interest,"_boxplot_colored_by_ben1.pdf"), 
-       height = 4, 
-       width = 12)
+ggsave(paste0(plot.dir,"S7_fig.pdf"), 
+       height = 2.5, 
+       width = 7.5)
 
-ggsave(paste0(plot.dir,"FS7_GWA_",trait_of_interest,"_boxplot_colored_by_ben1.png"), 
-       height = 4, 
-       width = 12)
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
 # FIGURE S8 - CHRX PxG - LD
@@ -1006,22 +1051,24 @@ x_pg_df%>%
   geom_boxplot(outlier.colour = NA)+
   geom_jitter(width = 0.25, aes(fill = factor(ben1_variant_trait)), shape = 21, size =2)+
   scale_fill_manual(values = c("cadetblue3","hotpink3"), labels = c("REF", "ALT"), name=expression(italic(ben-1))) +
-  theme_bw(15)+
+  theme_bw()+
+  plot.theme +
+  theme(strip.background = element_blank(),
+        panel.border = element_rect(size = 0.3))+
   facet_grid(.~qtl_marker1)+
   labs(x="QTL allele", y = "Regressed Animal Length")+
-  theme(axis.title.x = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3), 
-        axis.title.y = ggplot2::element_text(size = 16, face = "bold", color = "black"))
+  theme(axis.title.x = ggplot2::element_text(size = 12, face = "bold", color = "black", vjust = -0.3), 
+        axis.title.y = ggplot2::element_text(size = 12, face = "bold", color = "black"))
 
 
-ggsave(paste0(plot.dir,"FS8_GWAS_Xqtl_split_colored_by_ben1_variation.png"), 
+ggsave(paste0(plot.dir,"S8_fig.pdf"), 
        dpi = 300,
-       height = 8, 
-       width = 8)
-
+       height = 7, 
+       width = 7)
 
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
-# FIGURE S11 - phenotyping WN2002 
+# FIGURE S9 - phenotyping WN2002 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ #
 
 # read wild strain HTA data 
@@ -1043,10 +1090,10 @@ assayregressed_WI%>%
   theme(axis.title.x = element_blank(),
         legend.position="none")
 
-ggsave(paste0(plot.dir,"FS9_WN2002_HTA.png"), 
+ggsave(paste0(plot.dir,"S9_fig.pdf"), 
        dpi = 300,
-       height = 6, 
-       width = 10)
+       height = 4.5, 
+       width = 7.5)
 
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ # 
@@ -1144,10 +1191,10 @@ ytitle <- ggdraw() + draw_label("Tajima's D", fontface='bold', angle = 90, size 
 
 plot_grid(ytitle, plot_w_title, ncol=2, rel_widths=c(0.025, 1))
 
-ggsave(paste0(plot.dir,"FS11_TajimaDfigure.png"), 
+ggsave(paste0(plot.dir,"S11_fig.pdf"), 
        dpi = 300,
-       height = 10, 
-       width = 10)
+       height = 7, 
+       width = 7)
 
 ggsave(paste0(plot.dir,"TajimaDfigure.pdf"), 
        dpi = 300,

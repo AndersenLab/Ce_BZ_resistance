@@ -20,11 +20,136 @@ ancestry.colours <- c("gold2", "plum4", "darkorange1",
                       "mediumpurple4", "orange", "maroon","yellow3", "brown4", 
                       "yellow4", "sienna4", "chocolate", "gray19")
 
-plot.theme <-  theme(axis.text.x = ggplot2::element_text(size = 14),
-                     axis.text.y = ggplot2::element_text(size = 14),
-                     axis.title.x = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
-                     axis.title.y = ggplot2::element_text(size = 16, face = "bold", color = "black", vjust = -0.3),
-                     strip.text.x = element_text(size = 14, face = "bold"))
+plot.theme <-  theme(axis.text.x = ggplot2::element_text(size = 8),
+                     axis.text.y = ggplot2::element_text(size = 8),
+                     axis.title.x = ggplot2::element_text(size = 10, face = "bold", color = "black", vjust = -0.3),
+                     axis.title.y = ggplot2::element_text(size = 10, face = "bold", color = "black", vjust = -0.3),
+                     strip.text.x = element_text(size = 10, face = "bold"))
+
+read_file <- function(file, tofmin = 60, tofmax = 2000, extmin = 0,
+                      extmax = 10000, SVM = TRUE, levels = 2){
+  
+  # Read the raw sorter files and make the row names
+  
+  plate <- readSorter(file, tofmin, tofmax, extmin, extmax)
+  modplate <- with(plate,
+                   data.frame(row=Row,
+                              col=as.factor(Column),
+                              sort=Status.sort,
+                              TOF=TOF,
+                              EXT=EXT,
+                              time=Time.Stamp,
+                              green=Green,
+                              yellow=Yellow,
+                              red=Red))
+  
+  # Extract the time so that it is realtive to the first worm sorted
+  
+  modplate <- modplate %>%
+    dplyr::group_by(row, col) %>%
+    dplyr::do(COPASutils::extractTime(.))
+  modplate <- data.frame(modplate)
+  
+  # Normalize the optical values by time of flight
+  
+  modplate[, 10:13] <- apply(modplate[, c(5, 7:9)], 2,
+                             function(x) x / modplate$TOF)
+  colnames(modplate)[10:13] <- c("norm.EXT", "norm.green", "norm.yellow",
+                                 "norm.red")
+  
+  # Handle the SVM predictions if requested
+  
+  if(SVM){
+    plateprediction <- kernlab::predict(
+      COPASutils::bubbleSVMmodel_noProfiler,
+      modplate[,3:length(modplate)],
+      type="probabilities")
+    modplate$object <- plateprediction[, "1"]
+    modplate$call50 <- factor(as.numeric(modplate$object > 0.5),
+                              levels=c(1, 0), labels=c("object", "bubble"))
+  }
+  
+  # Calculate the life stage values based on the size of the worms
+  
+  modplate$stage <- ifelse(modplate$TOF >= 60 & modplate$TOF < 90, "L1",
+                           ifelse(modplate$TOF >= 90 & modplate$TOF < 200,
+                                  "L2/L3",
+                                  ifelse(modplate$TOF >= 200
+                                         & modplate$TOF < 300, "L4",
+                                         ifelse(modplate$TOF >= 300,
+                                                "adult", NA))))
+  
+  # Convert integer values to numerics
+  
+  modplate[, as.vector(which(lapply(modplate, class) == "integer"))] <- lapply(
+    modplate[, as.vector(which(lapply(modplate, class) == "integer"))],
+    as.numeric)
+  
+  # Get info about the plate using the new_info function 
+  
+  plateinfo <- new_info(file, levels)
+  
+  # Get the template base directory
+  
+  templatedir <- strsplit(file, "/")[[1]]
+  templatedir <- templatedir[-c(length(templatedir), length(templatedir) - 1)]
+  templatedir <- paste0(templatedir, collapse = "/")
+  templatedir <- paste0(templatedir, "/")
+  
+  # Get the template file paths
+  
+  strainsfile <- paste0(templatedir, "strains/",
+                        plateinfo$straintemplate[1], ".csv")
+  conditionsfile <- paste0(templatedir, "conditions/",
+                           plateinfo$conditiontemplate[1],
+                           ".csv")
+  controlsfile <- paste0(templatedir, "controls/",
+                         plateinfo$controltemplate[1], ".csv")
+  contamfile <- paste0(templatedir,
+                       "contamination/",
+                       sprintf("p%02d", plateinfo$plate[1]),
+                       "_contamination.csv")
+  
+  # Read all of the templates
+  
+  strains <- read_template(strainsfile, type="strains")
+  conditions  <- read_template(conditionsfile, type="conditions")
+  controls <- read_template(controlsfile, type="controls")
+  contam <- read_template(contamfile, type="contam")
+  
+  # Join all of the metadata and template info to the plate data
+  
+  modplate <- cbind(plateinfo[,1:5], modplate)
+  modplate <- dplyr::left_join(modplate, strains, by = c("row", "col"))
+  modplate <- dplyr::left_join(modplate, conditions, by = c("row", "col"))
+  modplate <- dplyr::left_join(modplate, controls, by = c("row", "col"))
+  modplate <- dplyr::left_join(modplate, contam, by = c("row", "col"))
+  
+  return(modplate)
+}
+
+readSorter <- function(file, tofmin=0, tofmax=10000, extmin=0, extmax=10000, reflx=TRUE)  {
+  data <- read.delim(file=file, header=T, na.strings=c("n/a"), as.is=T, stringsAsFactors=F)
+  if(is.null(data$EXT) & reflx){
+    stop("This file appears to have come from a machine with an LP Sampler, not a ReFLx module. Please set `reflx` = FALSE and try again.")
+  }
+  data <- data[!is.na(data$TOF),]
+  data <- data[,!is.na(data[1,])]
+  data <- data[(data$TOF>=tofmin & data$TOF<=tofmax) | data$TOF == -1,]
+  if(reflx){
+    data <- data[(data$EXT>=extmin & data$EXT<=extmax) | data$EXT == -1,]
+    data$Column <- as.factor(data$Column)
+    data$Row <- as.factor(data$Row)
+  } else {
+    data <- data[(data$Extinction>=extmin & data$Extinction<=extmax) | data$Extinction == -1,]
+    data$Column <- as.factor(data$Column)
+    data$Row <- as.factor(data$Row)
+  }
+  #removed the following two lines because in cases where a plate was interrupted during sort/score and two files exist for a certain plate the Row and Column data were defaulting to start at row A and col 1. This messes with plate stitching.
+  #levels(data$Row) <- LETTERS[1:8]
+  #levels(data$Column) <- 1:12
+  return(data)
+}
 
 manplot_edit <- function(plot_df, bf_line_color = "gray") {
   plot_traits <- unique(plot_df$trait)
@@ -41,23 +166,17 @@ manplot_edit <- function(plot_df, bf_line_color = "gray") {
                                       ymax = Inf, 
                                       fill = "blue"), 
                          color = "blue",fill = "cyan",linetype = 2, 
-                         alpha=.3)+
+                         alpha=.3, size = 0.3)+
       ggplot2::geom_hline(ggplot2::aes(yintercept = BF),
                           color = bf_line_color, 
                           alpha = .75,  
-                          size = 1) +
-      ggplot2::geom_point( ggplot2::aes(color= factor(aboveBF)) ) +
+                          size = 0.5) +
+      ggplot2::geom_point( ggplot2::aes(color= factor(aboveBF)), size = 0.25 ) +
       ggplot2::facet_grid( . ~ CHROM, scales = "free_x" , space = "free_x") +
       ggplot2::theme_bw() +
-      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 16),
-                     axis.text.y = ggplot2::element_text(size = 16),
-                     axis.title.x = ggplot2::element_text(size = 20, face = "bold", color = "black", vjust = -0.3), 
-                     axis.title.y = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
-                     strip.text.x = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
-                     strip.text.y = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
-                     plot.title = ggplot2::element_text(size = 24, face = "bold", vjust = 1), 
-                     panel.background = ggplot2::element_rect(color = "black",size = 1.2),
-                     legend.position = "none") +
+      plot.theme +
+      theme(strip.background = element_blank(),
+            legend.position = "none") +
       ggplot2::labs(x = "Genomic Position (Mb)",
                     y = expression(bold(-log[10](bolditalic(p)))))
   })
@@ -81,6 +200,7 @@ plot_bar <- function(df){
     labs(x = "Strain", y = paste0("Albendazole Resistance"))
   
 } 
+
 
 maxlodplot_edit <- function(map){
   map1 <- map %>%
@@ -264,16 +384,10 @@ tajimas_d_temp <- function (vcf_path = paste0(path.package("cegwas"), "/"),
   
   tajimas_d_plot <- ggplot2::ggplot(td) + 
     ggplot2::aes(x = position/1e+06, y = Td) + 
-    ggplot2::geom_point(size = 1, alpha = 0.75) + 
+    ggplot2::geom_line(size = 1) + 
     ggplot2::theme_bw() + 
-    ggplot2::theme(axis.text.x = ggplot2::element_text(size = 16),
-                   axis.text.y = ggplot2::element_text(size = 16),
-                   axis.title.x = ggplot2::element_text(size = 20, face = "bold", color = "black", vjust = -0.3), 
-                   axis.title.y = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
-                   strip.text.x = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
-                   strip.text.y = ggplot2::element_text(size = 20, face = "bold", color = "black"), 
-                   plot.title = ggplot2::element_text(size = 24,face = "bold", vjust = 1), 
-                   legend.position = "none", 
+    plot.theme +
+    ggplot2::theme(legend.position = "none", 
                    panel.background = ggplot2::element_rect(color = "black", size = 1.2), 
                    strip.background = ggplot2::element_rect(color = "black", size = 1.2)) + 
     ggplot2::labs(x = "Genomic Position (Mb)",  y = "Tajima's D")
@@ -522,9 +636,9 @@ modified_ld_plot <- function (plot_df, trait = NULL)
     ldplot <- ggplot2::ggplot(LDs) + ggplot2::aes(x = factor(SNP1, levels = unique(SNP1), ordered = T), 
                                                   y = factor(SNP2, levels = unique(SNP1), ordered = T)) + 
       ggplot2::geom_tile(ggplot2::aes(fill = corr)) + 
-      ggplot2::geom_text(ggplot2::aes(label = signif(corr, 3)), fontface = "bold", size = 12) + 
-      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 16, face = "bold", color = "black"), 
-                     axis.text.y = ggplot2::element_text(size = 16,face = "bold", color = "black"), 
+      ggplot2::geom_text(ggplot2::aes(label = signif(corr, 3)), fontface = "bold", size = 8) + 
+      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 10, face = "bold", color = "black"), 
+                     axis.text.y = ggplot2::element_text(size = 10,face = "bold", color = "black"), 
                      axis.title.x = ggplot2::element_text(size = 0, face = "bold", color = "black", vjust = -0.3), 
                      axis.title.y = ggplot2::element_text(size = 0, face = "bold", color = "black"), legend.position = "none") + 
       scale_x_discrete(labels = function(x) {
@@ -653,7 +767,9 @@ gene_level_TajimasD <- function(gt_matrix){
   return(gene_summary)
 }
 
-# outlier detection
+
+
+
 isnt_out_tukey <- function(x, k = 1.5, na.rm = TRUE) {
   quar <- quantile(x, probs = c(0.25, 0.75), na.rm = na.rm)
   iqr <- diff(quar)
